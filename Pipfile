@@ -5,13 +5,13 @@ name = "pypi"
 
 [packages]
 fastapi = "*"
-simple-websocket-server = "*"
 requests = "*"
 xmltodict = "*"
 pyserial = "*"
 uvicorn = {extras = ["standard"], version = "*"}
 psutil = "*"
 pypiwin32 = "*"
+pyinstaller = "==6.3"
 
 [dev-packages]
 

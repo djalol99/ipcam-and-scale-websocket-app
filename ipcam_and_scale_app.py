@@ -29,7 +29,6 @@ def get_available_port():
     global next_port
     counter = MAX_PORT -  MIN_PORT
     while not port_is_available(next_port):
-        print(f"counter={counter} PORT={next_port} is occupied")
         if counter:
             counter -= 1
         else:
@@ -71,7 +70,6 @@ def start_ws_ipcam_app(host: str = "127.0.0.1",
 def start_ws_scale_app(host: str = "127.0.0.1", port: int = None, comport: str = None, timeout: int = 100) -> None:
     path = ".\dist\scale_ws_app.exe"
     command = f"start {path} host={host} port={port} comport={comport} timeout={timeout}"
-    print(command)
     run_command(command)
 
 @app.get("/ipcam")
@@ -91,6 +89,17 @@ async def connect_scale(comport: str):
         start_ws_scale_app(port=port, comport=comport)
     return port
 
+def run_server(host="127.0.0.1", port=7000):
+    uvicorn.run(app=app, host=host, port=port, log_config=None)
+
+def stop_server(host="127.0.0.1", port=7000):
+    for process in psutil.process_iter():
+        connections =  process.connections()
+        if len(connections) > 0:
+            for conn in connections:
+                if conn.laddr.ip == host and conn.laddr.port == port:
+                    process.kill()
+                    break
 
 if __name__ == "__main__":
     import sys

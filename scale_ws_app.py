@@ -18,6 +18,7 @@ class ScaleWebSocket(WebSocket):
         self.reset = True
         try:
             self._serial =  Serial('COM' + self.com_port)
+            self.ws_server.not_connected = False
             for i in range(2):
                 self.read_data_from_scale()
             if self._serial.is_open:

@@ -10,10 +10,13 @@ import ipcam_and_scale_app
 
 
 # <<< Windows Service
-class GBSScale(win32serviceutil.ServiceFramework):
-    _svc_name_ = "GBSScale" #Service Name (exe)
-    _svc_display_name_ = "GBS Scale" #Service Name which will display in the Winfows Services Window 
-    _svc_description_ = "Reading data throug serial ports" #Service Name which will display in the Winfows Services Window
+class IPCamAndScale(win32serviceutil.ServiceFramework):
+    _svc_name_ = "ipcam_scale_ws_app" #Service Name (exe)
+    _svc_display_name_ = "IP Camera and Weight Scale data reader" #Service Name which will display in the Winfows Services Window 
+    _svc_description_ = "IP Camera streaming with ANPR function and Weight Scale data reader through com port" #Service Name which will display in the Winfows Services Window
+    #Custom properties
+    host = "127.0.0.1"
+    port = 7000
 
     def __init__(self, *args):
         '''
@@ -27,7 +30,7 @@ class GBSScale(win32serviceutil.ServiceFramework):
         '''
         Used to stop the service utility (restart / timeout / shutdown)
         '''
-        ipcam_and_scale_app.stop_server()
+        ipcam_and_scale_app.stop_server(self.host, self.port)
         self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
         win32event.SetEvent(self.hWaitStop)
 
@@ -35,15 +38,23 @@ class GBSScale(win32serviceutil.ServiceFramework):
         '''
         Used to execute all the piece of code that you want service to perform.
         '''
-        ipcam_and_scale_app.run_server()
+        ipcam_and_scale_app.run_server(self.host, self.port)
         
 # >>> Windows Service
 
 
 if __name__ == '__main__':
+
+    for index, param in enumerate(sys.argv):
+        key_val = param.split("=")
+        if key_val[0] == "host":
+            IPCamAndScale.host = key_val[1]
+        elif key_val[0] == "port":
+            IPCamAndScale.port = int(key_val[1])
+
     if len(sys.argv) == 1:
         servicemanager.Initialize()
-        servicemanager.PrepareToHostSingle(GBSScale)
+        servicemanager.PrepareToHostSingle(IPCamAndScale)
         servicemanager.StartServiceCtrlDispatcher()
     else:
-        win32serviceutil.HandleCommandLine(GBSScale)
+        win32serviceutil.HandleCommandLine(IPCamAndScale)
