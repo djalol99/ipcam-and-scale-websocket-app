@@ -1,106 +1,84 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>Live Streaming</title>
-    </head>
-    <body>
-        <div>
-            <button type="button" class="js-start-stream">Start Stream</button>
-            <button type="button" class="js-end-stream">End Stream</button>
-            <button type="button" class="js-connect-scale">Connect Scale</button>
-            <button type="button" class="js-close-scale">Close Connection to Scale</button>
-        </div>
-        <p class="js-result"></p>
-        <img id="ipcam" src="" alt="Ipcam..." width="640" height="360">
-        
-        <script>
-            let ipcamWS, ipcam, scaleWS;
 
-            function startStream() {
-                
-                const xhr = new XMLHttpRequest();
-                xhr.addEventListener("readystatechange", function() {
-                    if (this.readyState == 4 && this.status == 200) {
-                        const port = this.responseText;
-                        if (port == 0) {
-                            alert("There is no available port");
-                            return;
-                        }
+<head>
+    <title>Live Streaming</title>
+</head>
 
-                        console.log(port);
-                        ipcamWS = new WebSocket(`ws://localhost:${port}`);
-                        
-                        ipcam = document.getElementById("ipcam");
-                        ipcam.onload = function(){
-                            URL.revokeObjectURL(this.src); // release the blob URL once the image is loaded
-                        }
+<body>
+    <div>
+        <button type="button" class="js-start-stream">Start Stream</button>
+        <button type="button" class="js-end-stream">End Stream</button>
+        <button type="button" class="js-connect-scale">Connect Scale</button>
+        <button type="button" class="js-close-scale">Close Connection to Scale</button>
+    </div>
+    <p class="js-result"></p>
+    <img id="ipcam" src="" alt="Ipcam..." width="640" height="360">
 
-                        ipcamWS.addEventListener("message", function(event) {
-                            if (typeof(event.data) == "object") {
-                                ipcam.src = URL.createObjectURL(event.data);
-                                this.send(0);
-                            }
-                            else {
-                                const data = JSON.parse(event.data);
-                                const anpr = data["EventNotificationAlert"]["ANPR"];
-                                const licensePlate = anpr["licensePlate"];
-                                console.log(licensePlate);
-                            }
-                        });
-                    }
-                });
+    <script>
 
-                const password = btoa("@1392781");
-                const username = btoa("admin");
-                const ip_address = btoa("192.168.100.45");
-                xhr.open("GET", `http://localhost:7000/ipcam?ip_address=${ip_address}&username=${username}&password=${password}`);
-                xhr.send();
+        let ipcamWS, ipcam, scaleWS;
+
+        function startStream() {
+            const port = 9000;
+            ipcamWS = new WebSocket(`ws://localhost:${port}`);
+
+            ipcam = document.getElementById("ipcam");
+            ipcam.onload = function () {
+                URL.revokeObjectURL(this.src); // release the blob URL once the image is loaded
             }
 
-            function endStream() {
-                if (ipcam) {
-                    ipcamWS.close();
-                    ipcam.src = "";
+            ipcamWS.addEventListener("message", function (event) {
+                if (typeof (event.data) == "object") {
+                    ipcam.src = URL.createObjectURL(event.data);
+                    this.send(0);
                 }
-            }
+                else {
+                    const data = JSON.parse(event.data);
+                    const anpr = data["EventNotificationAlert"]["ANPR"];
+                    const licensePlate = anpr["licensePlate"];
+                    console.log(licensePlate);
+                }
+            });
+        }
 
-            document.querySelector(".js-start-stream").addEventListener("click", startStream);
-            document.querySelector(".js-end-stream").addEventListener("click", endStream);
-            // startStream();
-
-            function connectTwoScale() {
-                
-                const xhr = new XMLHttpRequest();
-                xhr.addEventListener("readystatechange", function() {
-                    if (this.readyState == 4 && this.status == 200) {
-                        const port = this.responseText;
-                        if (port == 0) {
-                            alert("There is no available port");
-                            return;
-                        }
-                  
-                        console.log(port);
-                        scaleWS = new WebSocket(`ws://127.0.0.1:${port}`);
-                        
-                        const p_result = document.querySelector(".js-result");
-                        
-                        scaleWS.addEventListener("message", function(event) {
-                            p_result.textContent = event.data; 
-                            this.send(0);
-                        });
-                    }
-                });
-                
-                const comport = 8;
-                xhr.open("GET", `http://localhost:7000/scale?comport=${comport}`);
-                xhr.send();
+        function endStream() {
+            if (ipcam) {
+                ipcamWS.close();
+                ipcam.src = "";
             }
+        }
 
-            function closeConnectionToSclae() {
-                scaleWS.close();
-            }
-            document.querySelector(".js-connect-scale").addEventListener("click", connectTwoScale);
-            document.querySelector(".js-close-scale").addEventListener("click", closeConnectionToSclae);
-        </script>
-    </body>
+        document.querySelector(".js-start-stream").addEventListener("click", startStream);
+        document.querySelector(".js-end-stream").addEventListener("click", endStream);
+        // startStream();
+
+        function connectToScale() {
+            console.log("start...")
+            const port = 9000;
+            scaleWS = new WebSocket(`ws://127.0.0.1:${port}`);
+
+            scaleWS.addEventListener("open", function(ev) {
+                this.send(1);
+            })
+            const p_result = document.querySelector(".js-result");
+
+            scaleWS.addEventListener("message", function (event) {
+                p_result.textContent = event.data;
+                this.send(2);
+            });
+
+            scaleWS.addEventListener("close", (ev) => console.log("closed."))
+        }
+
+        function closeConnectionToSclae() {
+            // scaleWS.send(0);
+            scaleWS.close();
+            document.querySelector(".js-result").textContent = "-";
+        }
+        document.querySelector(".js-connect-scale").addEventListener("click", connectToScale);
+        document.querySelector(".js-close-scale").addEventListener("click", closeConnectionToSclae);
+    </script>
+</body>
+
 </html>

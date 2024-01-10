@@ -20,7 +20,8 @@ __all__ = [
 ]
 
 
-_VALID_STATUS_CODES = [1000, 1001, 1002, 1003, 1007, 1008, 1009, 1010, 1011, 3000, 3999, 4000, 4999]
+_VALID_STATUS_CODES = [1000, 1001, 1002, 1003, 1007,
+                       1008, 1009, 1010, 1011, 3000, 3999, 4000, 4999]
 
 HANDSHAKE_STR = (
     'HTTP/1.1 101 Switching Protocols\r\n'
@@ -95,7 +96,8 @@ class WebSocket(object):  # pylint: disable=too-many-instance-attributes
         self.frag_start = False
         self.frag_type = BINARY
         self.frag_buffer = None
-        self.frag_decoder = codecs.getincrementaldecoder('utf-8')(errors='strict')
+        self.frag_decoder = codecs.getincrementaldecoder(
+            'utf-8')(errors='strict')
         self.closed = False
         self.sendq = deque()
 
@@ -253,7 +255,8 @@ class WebSocket(object):  # pylint: disable=too-many-instance-attributes
                 try:
                     key = self.request.headers['Sec-WebSocket-Key']
                     k = key.encode('ascii') + GUID_STR.encode('ascii')
-                    k_s = base64.b64encode(hashlib.sha1(k).digest()).decode('ascii')
+                    k_s = base64.b64encode(
+                        hashlib.sha1(k).digest()).decode('ascii')
                     hs = HANDSHAKE_STR % {'acceptstr': k_s}
                     self.sendq.append((BINARY, hs.encode('ascii')))
                     self.handshaked = True
@@ -262,7 +265,8 @@ class WebSocket(object):  # pylint: disable=too-many-instance-attributes
                     hs = FAILED_HANDSHAKE_STR
                     self._send_buffer(hs.encode('ascii'), True)
                     self.client.close()
-                    raise Exception('handshake failed: {}'.format(e))  # pylint: disable=consider-using-f-string
+                    raise Exception('handshake failed: {}'.format(
+                        e))  # pylint: disable=consider-using-f-string
         else:
             try:
                 data = self.client.recv(16384)
@@ -565,8 +569,10 @@ class WebSocketServer(object):
         if not host:
             host = '127.0.0.1'
         fam = socket.AF_INET6 if host is None else 0
-        host_info = socket.getaddrinfo(host, port, fam, socket.SOCK_STREAM, socket.IPPROTO_TCP, socket.AI_PASSIVE)
-        self.serversocket = socket.socket(host_info[0][0], host_info[0][1], host_info[0][2])
+        host_info = socket.getaddrinfo(
+            host, port, fam, socket.SOCK_STREAM, socket.IPPROTO_TCP, socket.AI_PASSIVE)
+        self.serversocket = socket.socket(
+            host_info[0][0], host_info[0][1], host_info[0][2])
         self.serversocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.serversocket.bind(host_info[0][4])
         self.serversocket.listen(self.request_queue_size)
@@ -580,7 +586,7 @@ class WebSocketServer(object):
             self.context.load_cert_chain(certfile, keyfile)
         else:
             self.context = ssl_context
-        
+
     def _decorate_socket(self, sock):  # pylint: disable=no-self-use
         if self._using_ssl:
             return self.context.wrap_socket(sock, server_side=True)
@@ -620,16 +626,19 @@ class WebSocketServer(object):
                 writers.append(fileno)
 
         if self.select_interval:
-            r_list, w_list, x_list = select(self.listeners, writers, self.listeners, self.select_interval)
+            r_list, w_list, x_list = select(
+                self.listeners, writers, self.listeners, self.select_interval)
         else:
-            r_list, w_list, x_list = select(self.listeners, writers, self.listeners)
+            r_list, w_list, x_list = select(
+                self.listeners, writers, self.listeners)
 
         for ready in w_list:
             client = self.connections[ready]
             try:
                 while client.sendq:
                     opcode, payload = client.sendq.popleft()
-                    remaining = client._send_buffer(payload)  # pylint: disable=protected-access
+                    remaining = client._send_buffer(
+                        payload)  # pylint: disable=protected-access
                     if remaining is not None:
                         client.sendq.appendleft((opcode, remaining))
                         break
@@ -650,7 +659,8 @@ class WebSocketServer(object):
                     newsock = self._decorate_socket(sock)
                     newsock.setblocking(False)  # pylint: disable=no-member
                     fileno = newsock.fileno()  # pylint: disable=no-member
-                    self.connections[fileno] = self._construct_websocket(newsock, address)
+                    self.connections[fileno] = self._construct_websocket(
+                        newsock, address)
                     self.listeners.append(fileno)
                 except Exception:  # pylint: disable=broad-except
                     if sock is not None:

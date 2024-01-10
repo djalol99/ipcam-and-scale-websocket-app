@@ -1,18 +1,20 @@
 from simple_websocket_server import WebSocketServer, WebSocket
-import time, sys
+import time
+import sys
 
 from threading import Thread
 from urllib.parse import urljoin
 import requests
 from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 from requests.exceptions import ConnectionError, HTTPError, ReadTimeout
-import xmltodict, json
+import xmltodict
+import json
 
 
-class Client:
+class HikvisionAPI:
     image_queue_size = 5
     time_interval_pictures = 0.05
-    _spend_time_for_picture = 1 # updated on each request to image
+    _spend_time_for_picture = 1  # updated on each request to image
 
     def __init__(self, host: str, username: str = None, password: str = None):
         """
@@ -48,7 +50,8 @@ class Client:
         url = urljoin(self.host, "/ISAPI/Event/notification/alertStream")
         try:
             while self.stream:
-                response = self.session.request("get", url, timeout=timeout, stream=True)
+                response = self.session.request(
+                    "get", url, timeout=timeout, stream=True)
                 for chunk in response.iter_lines(chunk_size=1024, delimiter=b'--boundary'):
                     if not self.stream:
                         break
@@ -67,11 +70,13 @@ class Client:
             self.stream = False
 
     def get_pictures(self, width=640, height=360, timeout=3):
-        url = urljoin(self.host, f"/ISAPI/Streaming/channels/101/picture?videoResolutionWidth={width}&videoResolutionHeight={height}")
+        url = urljoin(
+            self.host, f"/ISAPI/Streaming/channels/101/picture?videoResolutionWidth={width}&videoResolutionHeight={height}")
         try:
             while self.stream:
                 start_request = time.time()
-                response = self.session.request("get", url, timeout=timeout, stream=True)
+                response = self.session.request(
+                    "get", url, timeout=timeout, stream=True)
                 end_request = time.time()
                 self._spend_time_for_picture = end_request - start_request
                 if len(self.pictures) >= self.image_queue_size:
@@ -85,6 +90,7 @@ class Client:
     def get_spend_time_to_img(self):
         return self._spend_time_for_picture + self.time_interval_pictures
 
+
 class ScaleWebSocket(WebSocket):
     ws_server = None
     ipcam = None
@@ -93,58 +99,64 @@ class ScaleWebSocket(WebSocket):
     anpr = False
 
     def handle(self):
-        time.sleep(self._client.get_spend_time_to_img())
+        time.sleep(self.ws_server.hikapi.get_spend_time_to_img())
         self._send()
 
     def connected(self):
-        self._client = None    
-        tries = 3
-        while tries:
-            try:
-                self._client = Client(host="http://" + self.ipcam, username=self.username, password=self.password)
-                self._client.stream = True
-                self.ws_server.not_connected = False
-                break
-            except ReadTimeout:
-                tries -= 1
-                continue
-            except (ConnectionError, HTTPError):
-                break
-
-        if self._client is None or not self._client.stream:
-            self.ws_server.stop_server()
-            return
-
-        thread_pictures = Thread(target=self._client.get_pictures, args=())
-        thread_pictures.daemon = True
-        thread_pictures.start()
-
-        if self.anpr:
-            thread_events = Thread(target=self._client.get_events, args=())
-            thread_events.daemon = True
-            thread_events.start()
-
-        while self._client.stream:
-            if len(self._client.pictures) or (self.anpr and len(self._client.events)):
-                self._send()
-                break
-            time.sleep(0.2)    
+        pass
 
     def handle_close(self):
-        if self._client:
-            self._client.stream = False
-        self.ws_server.stop_server()
+        pass
+        # if self.ws_server.hikapi:
+        #     self.ws_server.hikapi.stream = False
+
+    def connect_hikapi(self):
+        if self.ws_server.hikapi:
+            pass
+        else:
+            tries = 3
+            while tries:
+                try:
+                    self.ws_server.hikapi = HikvisionAPI(
+                        host="http://" + self.ipcam, username=self.username, password=self.password)
+                    self.ws_server.hikapi.stream = True
+                    self.ws_server.not_connected = False
+                    break
+                except ReadTimeout:
+                    tries -= 1
+                    continue
+                except (ConnectionError, HTTPError):
+                    break
+
+            if self.ws_server.hikapi is None or not self.ws_server.hikapi.stream:
+                return
+
+            thread_pictures = Thread(
+                target=self.ws_server.hikapi.get_pictures, args=())
+            thread_pictures.daemon = True
+            thread_pictures.start()
+
+            if self.anpr:
+                thread_events = Thread(
+                    target=self.ws_server.hikapi.get_events, args=())
+                thread_events.daemon = True
+                thread_events.start()
+
+        while self.ws_server.hikapi.stream:
+            if len(self.ws_server.hikapi.pictures) or (self.anpr and len(self.ws_server.hikapi.events)):
+                self._send()
+                break
+            time.sleep(0.2)
 
     def _send(self):
-        if self._client.stream:
-            if len(self._client.pictures):
-                self._img_bytes = self._client.pictures.pop(0)
+        if self.ws_server.hikapi.stream:
+            if len(self.ws_server.hikapi.pictures):
+                self._img_bytes = self.ws_server.hikapi.pictures.pop(0)
             self.send_message(self._img_bytes)
-            if self.anpr and len(self._client.events):
-                self.send_message(self._client.events.pop(0))
+            if self.anpr and len(self.ws_server.hikapi.events):
+                self.send_message(self.ws_server.hikapi.events.pop(0))
         else:
             self.close()
-            self.ws_server.stop_server()
 
 
 if __name__ == "__main__":
@@ -154,7 +166,7 @@ if __name__ == "__main__":
     username = None
     password = None
     anpr = False
-    timeout = 100
+    timeout = 1000
 
     for param in sys.argv:
         key_val = param.split("=")
@@ -173,9 +185,9 @@ if __name__ == "__main__":
         elif key_val[0] == "timeout":
             timeout = int(key_val[1])
         elif key_val[0] == "image_queue_size":
-            Client.image_queue_size = int(key_val[1])
+            HikvisionAPI.image_queue_size = int(key_val[1])
         elif key_val[0] == "time_interval_pictures":
-            Client.time_interval_pictures = float(key_val[1])
+            HikvisionAPI.time_interval_pictures = float(key_val[1])
 
     if host and port and ipcam and username and password:
         ScaleWebSocket.ipcam = ipcam
@@ -183,6 +195,7 @@ if __name__ == "__main__":
         ScaleWebSocket.password = password
         ScaleWebSocket.anpr = anpr
         try:
+            WebSocketServer.hikapi = None
             server = WebSocketServer(host, port, ScaleWebSocket)
             ScaleWebSocket.ws_server = server
             server.serve_forever(timeout=timeout)
